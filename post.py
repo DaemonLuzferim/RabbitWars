@@ -12,7 +12,6 @@ def get_posts():
         for p in posts
     ])
 
-
 @posts.route("/posts", methods=["POST"])
 @jwt_required()
 def create_post():
