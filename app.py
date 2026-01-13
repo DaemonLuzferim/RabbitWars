@@ -3,7 +3,7 @@ from flask_cors import CORS
 from flask_jwt_extended import JWTManager
 from models import db
 from auth import auth
-from posts import posts
+from api_posts import posts
 import os
 
 app = Flask(__name__)
