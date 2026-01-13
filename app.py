@@ -1,13 +1,17 @@
 from flask import Flask
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager
-from config import Config
 from models import db
 from auth import auth
 from posts import posts
+import os
 
 app = Flask(__name__)
-app.config.from_object(Config)
+
+app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "super-secret-key")
+app.config["JWT_SECRET_KEY"] = os.environ.get("JWT_SECRET_KEY", "jwt-secret")
+app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///database.db"
+app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 CORS(app)
 db.init_app(app)
