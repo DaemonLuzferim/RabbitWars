@@ -1,5 +1,6 @@
 flask
 flask-cors
+werkzeug
 flask-jwt-extended
 flask-sqlalchemy
 gunicorn
