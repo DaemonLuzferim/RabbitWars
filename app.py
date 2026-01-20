@@ -1,15 +1,13 @@
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
-from flask_jwt_extended import (
-    JWTManager, create_access_token
-)
+from flask_jwt_extended import JWTManager, create_access_token
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 import os
 
 # =========================
-# Configuración
+# CONFIGURACIÓN
 # =========================
 app = Flask(__name__)
 CORS(app)
@@ -37,49 +35,66 @@ class User(db.Model):
     email = db.Column(db.String(120), unique=True, nullable=False)
     password = db.Column(db.String(200), nullable=False)
 
-# Crear DB si no existe
 with app.app_context():
     db.create_all()
 
 # =========================
-# AUTH
+# REGISTRO
 # =========================
 @app.route("/register", methods=["POST"])
 def register():
     data = request.get_json()
+
+    email = data.get("email")
+    password = data.get("password")
+
+    if not email or not password:
+        return jsonify(msg="Completa todos los campos"), 400
+
+    if User.query.filter_by(email=email).first():
+        return jsonify(msg="El usuario ya existe"), 400
+
+    user = User(
+        email=email,
+        password=generate_password_hash(password)
+    )
+
+    db.session.add(user)
+    db.session.commit()
+
+    token = create_access_token(identity=email)
+
+    return jsonify(
+        msg="Usuario registrado correctamente",
+        user={"email": email},
+        token=token
+    ), 201
+
+# =========================
+# LOGIN
+# =========================
+@app.route("/login", methods=["POST"])
+def login():
+    data = request.get_json()
+
     email = data.get("email")
     password = data.get("password")
 
     if not email or not password:
         return jsonify(msg="Datos incompletos"), 400
 
-    if User.query.filter_by(email=email).first():
-        return jsonify(msg="Usuario ya existe"), 400
-
-    user = User(
-        email=email,
-        password=generate_password_hash(password)
-    )
-    db.session.add(user)
-    db.session.commit()
-
-    token = create_access_token(identity=email)
-    return jsonify(user={"email": email}, token=token), 201
-
-
-@app.route("/login", methods=["POST"])
-def login():
-    data = request.get_json()
-    email = data.get("email")
-    password = data.get("password")
-
     user = User.query.filter_by(email=email).first()
 
     if not user or not check_password_hash(user.password, password):
-        return jsonify(msg="Credenciales incorrectas"), 401
+        return jsonify(msg="Usuario o contraseña incorrectos"), 401
 
     token = create_access_token(identity=email)
-    return jsonify(user={"email": email}, token=token), 200
+
+    return jsonify(
+        msg="Login exitoso",
+        user={"email": email},
+        token=token
+    ), 200
 
 # =========================
 # IMÁGENES
@@ -87,34 +102,41 @@ def login():
 def allowed_file(filename):
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
 
-
 @app.route("/upload", methods=["POST"])
 def upload_file():
     if "file" not in request.files:
-        return jsonify(error="No file"), 400
+        return jsonify(msg="No se envió archivo"), 400
 
     file = request.files["file"]
+
     if file.filename == "":
-        return jsonify(error="No filename"), 400
+        return jsonify(msg="Archivo vacío"), 400
 
-    if allowed_file(file.filename):
-        filename = secure_filename(file.filename)
-        file.save(os.path.join(UPLOAD_FOLDER, filename))
-        return jsonify(success=True, filename=filename)
+    if not allowed_file(file.filename):
+        return jsonify(msg="Formato no permitido"), 400
 
-    return jsonify(error="Formato no permitido"), 400
+    filename = secure_filename(file.filename)
+    file.save(os.path.join(app.config["UPLOAD_FOLDER"], filename))
 
+    return jsonify(success=True, filename=filename), 200
 
-@app.route("/images")
+@app.route("/images", methods=["GET"])
 def list_images():
-    return jsonify(os.listdir(UPLOAD_FOLDER))
-
+    return jsonify(os.listdir(app.config["UPLOAD_FOLDER"]))
 
 @app.route("/uploads/<filename>")
 def uploaded_file(filename):
-    return send_from_directory(UPLOAD_FOLDER, filename)
+    return send_from_directory(app.config["UPLOAD_FOLDER"], filename)
 
-
+# =========================
+# ROOT
+# =========================
 @app.route("/")
 def home():
-    return jsonify(message="Backend funcionando")
+    return jsonify(message="Backend funcionando correctamente")
+
+# =========================
+# RUN
+# =========================
+if __name__ == "__main__":
+    app.run(debug=True)
