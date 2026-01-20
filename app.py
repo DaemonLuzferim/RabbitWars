@@ -43,32 +43,34 @@ with app.app_context():
 # =========================
 @app.route("/register", methods=["POST"])
 def register():
-    data = request.get_json()
+    print("HEADERS:", request.headers)
+    print("RAW DATA:", request.data)
+    print("JSON:", request.get_json(silent=True))
+
+    data = request.get_json(silent=True)
+
+    if not data:
+        return jsonify(msg="No se recibió JSON"), 400
 
     email = data.get("email")
     password = data.get("password")
 
     if not email or not password:
-        return jsonify(msg="Completa todos los campos"), 400
+        return jsonify(msg="Datos incompletos"), 400
 
     if User.query.filter_by(email=email).first():
-        return jsonify(msg="El usuario ya existe"), 400
+        return jsonify(msg="Usuario ya existe"), 400
 
     user = User(
         email=email,
         password=generate_password_hash(password)
     )
-
     db.session.add(user)
     db.session.commit()
 
     token = create_access_token(identity=email)
+    return jsonify(user={"email": email}, token=token), 201
 
-    return jsonify(
-        msg="Usuario registrado correctamente",
-        user={"email": email},
-        token=token
-    ), 201
 
 # =========================
 # LOGIN
